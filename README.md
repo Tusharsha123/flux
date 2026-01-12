@@ -1,12 +1,6 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-</div>
+
 
 # Run and deploy your AI Studio app
-
-This contains everything you need to run your app locally.
-
-View your app in AI Studio: https://ai.studio/apps/temp/1
 
 ## Run Locally
 
@@ -15,6 +9,33 @@ View your app in AI Studio: https://ai.studio/apps/temp/1
 
 1. Install dependencies:
    `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
+2. Run the app:
    `npm run dev`
+
+## Why We Built It This Way
+
+Recording: Pure browser MediaRecorder API (getDisplayMedia for screen + getUserMedia for mic). Merges streams, chunks WebM blobs on stop. No server needed—feels instant.
+
+Trimming: @ffmpeg/ffmpeg WASM runs -ss [start] -to [end] client-side. WebM output or MP4 export. Keeps everything snappy, no upload-wait.
+
+App Structure: Next.js 15 App Router. /record page owns UI/controls, /watch/[id] embeds player + stats, /api/upload handles presigned S3 POSTs (client uploads direct).
+
+Storage/Analytics: Vercel Postgres for {id, viewCount, completionRate}. Simple SQL upserts on load/video.ended. Tailwind + shadcn/ui for clean, mobile-friendly buttons/timeline.
+
+Tradeoffs: Client-heavy for MVP speed, but scales fine on Vercel Edge.
+
+## Production Polish
+
+Auth: NextAuth.js for logins, private clips, orgs.
+
+Playback: Server ffmpeg → HLS/m3u8 for adaptive bitrate, seeking.
+
+Reliability: BullMQ queues for uploads, Redis cache for hot analytics.
+
+Extras: Thumbs on upload, edit timeline history, download button.
+
+Ops: Cloudflare R2 (cheaper), Sentry errors, rate limits, CSP headers.
+
+Perf: Lazy-load FFmpeg (big WASM), progressive enhancement if JS off.
+
+Built for demo, ready for 1k users/day. Ping me for code walkthru!
