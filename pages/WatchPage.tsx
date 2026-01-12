@@ -35,18 +35,37 @@ const WatchPage: React.FC<WatchPageProps> = ({ record, onBack }) => {
     return () => { if (url) URL.revokeObjectURL(url); };
   }, [record.id]);
 
+  /**
+   * Generates a clean, shareable URL.
+   * Prevents double-domain concatenation by splitting on origin.
+   */
   const getShareUrl = () => {
     try {
-      // Robust URL generation to avoid the "double domain" concatenation issue
-      const currentUrl = new URL(window.location.href);
-      const baseUrl = `${currentUrl.protocol}//${currentUrl.host}${currentUrl.pathname}`;
-      return `${baseUrl.endsWith('/') ? baseUrl : baseUrl + '/'}#/watch/${record.id}`;
+      const loc = window.location;
+      const baseUrl = `${loc.protocol}//${loc.host}${loc.pathname}`;
+      // Ensure only one trailing slash before the hash
+      const cleanBase = baseUrl.replace(/\/+$/, '');
+      return `${cleanBase}/#/watch/${record.id}`;
     } catch (e) {
-      return window.location.href.split('#')[0] + `#/watch/${record.id}`;
+      return `${window.location.origin}/#/watch/${record.id}`;
     }
   };
 
   const shareUrl = getShareUrl();
+
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+    const handleTimeUpdate = () => {
+      if (!video.duration || video.duration === Infinity) return;
+      const progress = (video.currentTime / video.duration) * 100;
+      if (progress > 5) { // Only track if they actually started watching
+        storageService.updateCompletion(record.id, progress);
+      }
+    };
+    video.addEventListener('timeupdate', handleTimeUpdate);
+    return () => video.removeEventListener('timeupdate', handleTimeUpdate);
+  }, [videoUrl]);
 
   const copyToClipboard = () => {
     navigator.clipboard.writeText(shareUrl).then(() => {
@@ -64,7 +83,7 @@ const WatchPage: React.FC<WatchPageProps> = ({ record, onBack }) => {
            ) : videoUrl ? (
              <video ref={videoRef} src={videoUrl} controls className="w-full h-full" autoPlay />
            ) : (
-             <p className="text-zinc-600 text-xs font-bold uppercase">Video not found in local vault.</p>
+             <p className="text-zinc-600 text-xs font-bold uppercase tracking-widest">Recording not found in local vault</p>
            )}
          </div>
          <div className="p-10 bg-zinc-950/50">
@@ -77,35 +96,39 @@ const WatchPage: React.FC<WatchPageProps> = ({ record, onBack }) => {
                </div>
                <div className="flex flex-col gap-3 min-w-[240px]">
                   <div className="flex gap-4">
-                    <button onClick={copyToClipboard} className={`flex-1 px-8 py-3.5 rounded-2xl text-xs font-bold border transition-all ${copied ? 'bg-white text-zinc-900 border-white' : 'border-zinc-800 text-zinc-400 hover:text-zinc-100'}`}>
+                    <button onClick={copyToClipboard} className={`flex-1 px-8 py-3.5 rounded-2xl text-xs font-bold border transition-all ${copied ? 'bg-zinc-100 text-zinc-900 border-white' : 'border-zinc-800 text-zinc-400 hover:text-zinc-100'}`}>
                       {copied ? 'Link Copied' : 'Share Link'}
                     </button>
-                    {videoUrl && <a href={videoUrl} download={`${record.id}.mp4`} className="px-8 py-3.5 rounded-2xl bg-zinc-100 text-zinc-950 text-xs font-bold transition-all hover:bg-white">Save</a>}
+                    {videoUrl && <a href={videoUrl} download={`${record.id}.webm`} className="px-8 py-3.5 rounded-2xl bg-zinc-100 text-zinc-950 text-xs font-bold transition-all hover:bg-white text-center">Save</a>}
                   </div>
                   <div className="px-4 py-2 bg-zinc-900/50 rounded-xl border border-zinc-800/50">
-                    <p className="text-[9px] text-zinc-500 truncate font-mono">{shareUrl}</p>
+                    <p className="text-[9px] text-zinc-500 truncate font-mono select-all">{shareUrl}</p>
                   </div>
                </div>
             </div>
          </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-10 border-t border-zinc-900/30 pt-10">
         <div className="p-8 bg-zinc-950/30 rounded-[2rem] border border-zinc-900/50 space-y-6">
            <h3 className="text-[10px] uppercase font-black text-zinc-700 tracking-[0.4em]">Analytics</h3>
            <div className="flex gap-12">
               <div>
                  <p className="text-4xl font-bold text-zinc-100">{record.views}</p>
-                 <p className="text-[10px] text-zinc-500 font-bold uppercase">Views</p>
+                 <p className="text-[10px] text-zinc-500 font-bold uppercase">Total Views</p>
               </div>
               <div>
                  <p className="text-4xl font-bold text-zinc-100">{record.completionRate.toFixed(0)}%</p>
                  <p className="text-[10px] text-zinc-500 font-bold uppercase">Completion</p>
               </div>
            </div>
+           <div className="h-1.5 w-full bg-zinc-900 rounded-full overflow-hidden">
+              <div className="h-full bg-zinc-100 transition-all duration-1000 shadow-[0_0_10px_rgba(255,255,255,0.3)]" style={{ width: `${record.completionRate}%` }} />
+           </div>
         </div>
-        <div className="flex flex-col items-center justify-center p-8 bg-zinc-900/10 rounded-[2rem] border border-dashed border-zinc-800">
-           <button onClick={onBack} className="px-8 py-3 rounded-2xl bg-zinc-100 text-zinc-950 font-black text-[10px] uppercase tracking-widest">New Recording</button>
+        <div className="flex flex-col items-center justify-center p-8 bg-zinc-900/10 rounded-[2rem] border border-dashed border-zinc-800 space-y-4">
+           <p className="text-zinc-500 text-xs">Want to record another flow?</p>
+           <button onClick={onBack} className="px-8 py-3 rounded-2xl bg-zinc-100 text-zinc-950 font-black text-[10px] uppercase tracking-widest active:scale-95 transition-transform">Start New Flow</button>
         </div>
       </div>
     </div>
